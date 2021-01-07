@@ -2,6 +2,7 @@
 Description: This is Java program that counts word occurrences in a given input file and outputs an HTML document with a table of the words and counts listed in alphabetical order.
 
 Instructions:
+
 The program shall ask the user for the name of an input file and for the name of an output file.
 
 The input file can be an arbitrary text file. No special requirements are imposed.
