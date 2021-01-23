@@ -1,5 +1,10 @@
-import components.sequence.Sequence;
-import components.sequence.Sequence1L;
+import java.util.Comparator;
+
+import components.map.Map;
+import components.map.Map.Pair;
+import components.map.Map1L;
+import components.queue.Queue;
+import components.queue.Queue1L;
 import components.set.Set;
 import components.set.Set1L;
 import components.simplereader.SimpleReader;
@@ -12,13 +17,24 @@ import components.simplewriter.SimpleWriter1L;
  *
  * @author Mohamed Mohamed
  */
-public final class WordCounter {
+public final class ProjectWordCounter {
 
     /**
      * Default constructor--private to prevent instantiation.
      */
-    private WordCounter() {
+    private ProjectWordCounter() {
         // no code needed here
+    }
+
+    /**
+     * Arranges strings in alphabetical order
+     */
+    private static class alphabetize implements Comparator<String> {
+        @Override
+
+        public int compare(String word1, String word2) {
+            return word1.toLowerCase().compareTo(word2.toLowerCase());
+        }
     }
 
     /**
@@ -49,6 +65,38 @@ public final class WordCounter {
 
     }
 
+    /**
+     * Returns the first "word" (maximal length string of characters not in
+     * {@code separators}) or "separator string" (maximal length string of
+     * characters in {@code separators}) in the given {@code text} starting at
+     * the given {@code position}.
+     *
+     * @param text
+     *            the {@code String} from which to get the word or separator
+     *            string
+     * @param position
+     *            the starting index
+     * @param separators
+     *            the {@code Set} of separator characters
+     * @return the first word or separator string found in {@code text} starting
+     *         at index {@code position}
+     * @requires 0 <= position < |text|
+     * @ensures <pre>
+     * nextWordOrSeparator =
+     *   text[position, position + |nextWordOrSeparator|)  and
+     * if entries(text[position, position + 1)) intersection separators = {}
+     * then
+     *   entries(nextWordOrSeparator) intersection separators = {}  and
+     *   (position + |nextWordOrSeparator| = |text|  or
+     *    entries(text[position, position + |nextWordOrSeparator| + 1))
+     *      intersection separators /= {})
+     * else
+     *   entries(nextWordOrSeparator) is subset of separators  and
+     *   (position + |nextWordOrSeparator| = |text|  or
+     *    entries(text[position, position + |nextWordOrSeparator| + 1))
+     *      is not subset of separators)
+     * </pre>
+     */
     private static String nextWordOrSeparator(String text, int position,
             Set<Character> separators) {
         assert text != null : "Violation of: text is not null";
@@ -57,6 +105,7 @@ public final class WordCounter {
         assert position < text.length() : "Violation of: position < |text|";
 
         char piece = text.charAt(position);
+        String pieceStr = "" + piece;
         int i = 0;
         String result = "";
         if (separators.contains(text.charAt(position))) {
@@ -64,8 +113,9 @@ public final class WordCounter {
             while (i < text.substring(position).length()
                     && separators.contains(piece)) {
                 piece = text.charAt(position + i);
+                pieceStr = "" + piece;
                 if (separators.contains(piece)) {
-                    result = result + piece;
+                    result = result.concat(pieceStr);
                 }
                 i++;
             }
@@ -75,8 +125,9 @@ public final class WordCounter {
             while (i < text.substring(position).length()
                     && !(separators.contains(piece))) {
                 piece = text.charAt(position + i);
+                pieceStr = "" + piece;
                 if (!separators.contains(piece)) {
-                    result = result + piece;
+                    result = result.concat(pieceStr);
                 }
                 i++;
             }
@@ -87,52 +138,196 @@ public final class WordCounter {
     }
 
     /**
+     * generate words from input file and puts them into Qwords
+     *
+     * @param Queue
+     *            words from input file
+     * @updates Qwords
+     * @requires <pre>
+     * input.is_open
+     *
+     * </pre>
+     * @ensures <pre>
+     * input.is_open and
+     * Qwords has all the words and does have word separators
+     * </pre>
+     */
+    private static Queue<String> wordprocessor(SimpleReader file,
+            Queue<String> Qwords, Set<Character> separatorSet) {
+
+        while (!file.atEOS()) {
+
+            String line = file.nextLine();
+            int position = 0;
+
+            while (position < line.length()) {
+
+                String token = nextWordOrSeparator(line, position,
+                        separatorSet);
+
+                if (!separatorSet.contains(token.charAt(0))) {
+                    Qwords.enqueue(token);
+                }
+
+                position += token.length();
+            }
+
+        }
+
+        return Qwords;
+    }
+
+    /**
+     * finds words from MAP and prints the on the IndexPage
+     *
+     * @param Map
+     *            words from the input map
+     * @updates Qwords
+     * @requires <pre>
+     * input.is_open and
+     *
+     * </pre>
+     * @ensures <pre>
+     * record={@code Map}'s words and occurrences
+     * and
+     * print out into html format]
+     * </pre>
+     */
+    public static void wordSort(Queue<String> Qwords,
+            Map<String, Integer> record, Comparator<String> sorter,
+            SimpleWriter out) {
+
+        while (Qwords.length() != 0) {
+
+            String word = Qwords.dequeue();
+
+            if (!record.hasKey(word)) {
+
+                record.add(word, 1);
+            } else {
+                int tempCount = record.value(word);
+                tempCount++;
+                record.replaceValue(word, tempCount);
+            }
+        }
+
+        
+        Map<String, Integer> tempMap = record.newInstance();
+        Queue<String> tempWords = Qwords.newInstance();
+
+        while (record.iterator().hasNext()) {
+            Pair<String, Integer> tempPair = record.removeAny();
+            tempMap.add(tempPair.key(), tempPair.value());
+            tempWords.enqueue(tempPair.key());
+
+        }
+
+        record.clear();
+
+        tempWords.sort(sorter);
+        while (tempWords.iterator().hasNext()) {
+            String word = tempWords.dequeue();
+            Pair<String, Integer> orderedDictionary = tempMap.remove(word);
+            out.println("<tr>");
+            out.println("<td>" + orderedDictionary.key() + "</td>");
+            out.println("<td>" + orderedDictionary.value() + "</td>");
+            out.println("</tr>");
+        }
+    }
+
+    /**
+     * Outputs the "opening" tags in the generated HTML file. These are the
+     * expected elements generated by this method:
+     *
+     * <html> <head> <title>Words Counted in data/gettysburg.txt</title> </head>
+     * <body>
+     * <h2>Words Counter</h2>
+     * <hr />
+     * <ul>
+     *
+     *
+     * @param out
+     *            the output stream
+     * @updates out.content
+     * @requires out.is_open
+     * @ensures out.content = #out.content * [the HTML "opening" tags]
+     */
+    private static void outputHeader(SimpleWriter out) {
+        assert out != null : "Violation of: out is not null";
+        assert out.isOpen() : "Violation of: out.is_open";
+        out.println("<html>");
+        out.println("<head>");
+        out.println("<title>Words Counted from your file</title>");
+        out.println("</head>");
+        out.println("<body>");
+        out.println("<h2>Words Counter</h2>");
+        out.println("   <hr/>");
+        out.println("<table border=\"1\">");
+        out.println("<tr>");
+        out.println("<th>Words</th>");
+        out.println("<th>Counts</th>");
+        out.println("</tr>");
+
+    }
+
+    /**
+     * Outputs the "closing" tags in the generated HTML file. These are the
+     * expected elements generated by this method:
+     *
+     * </table>
+     * </body> </html>
+     *
+     * @param out
+     *            the output stream
+     * @updates out.contents
+     * @requires out.is_open
+     * @ensures out.content = #out.content * [the HTML "closing" tags]
+     */
+    private static void outputFooter(SimpleWriter out) {
+        assert out != null : "Violation of: out is not null";
+        assert out.isOpen() : "Violation of: out.is_open";
+
+        out.print("</table>");
+        out.print("</body> </html>");
+    }
+
+    /**
      * Main method.
      *
      * @param args
      *            the command line arguments; unused here
      */
     public static void main(String[] args) {
-        SimpleWriter out = new SimpleWriter1L();
         SimpleReader in = new SimpleReader1L();
-        /*
-         * Define separator characters for test
-         */
-        out.println("Enter: ");
-        final String separatorStr = " \t~!@#$%^&*()_+=-?><,";
+        SimpleWriter out = new SimpleWriter1L();
+        out.println("Enter the input file:");
+        SimpleReader file = new SimpleReader1L(in.nextLine());
+        out.println("Enter the output folder");
+        SimpleWriter indexPage = new SimpleWriter1L(in.nextLine());
+
+        
+        
+        final String separatorStr = " \t, -- .";
         Set<Character> separatorSet = new Set1L<>();
         generateElements(separatorStr, separatorSet);
-        /*
-         * Open input and output streams
-         */
-        Sequence<String> s = new Sequence1L<>();
-        String testStr = in.nextLine();
-        int position = 0;
 
-        int greatCount = 0;
-        while (position < testStr.length()) {
-            String token = nextWordOrSeparator(testStr, position, separatorSet);
-            if (separatorSet.contains(token.charAt(0))) {
-                out.print("  Separator: <");
-            } else {
+        Map<String, Integer> myMap = new Map1L<>();
+        Queue<String> Qwords = new Queue1L<>();
 
-                out.print("  Word: <");
+        wordprocessor(file, Qwords, separatorSet);
 
-                for (int i = 0; i < s.length(); i++) {
-                    if (token.equals(s.entry(i))) {
-                        greatCount++;
+        //arrange words in alphabetical order
+        Comparator<String> sorter = new alphabetize();
+        Qwords.sort(sorter);
 
-                    } else {
-                        s.add(0, token);
-                        greatCount++;
-                    }
-                }
-            }
-            out.println(token + ">");
+        outputHeader(indexPage);
+        wordSort(Qwords, myMap, sorter, indexPage);
+        outputFooter(indexPage);
 
-            position += token.length();
-        }
-        out.println(greatCount);
+        file.close();
+        in.close();
+        out.close();
+        indexPage.close();
     }
 
 }
